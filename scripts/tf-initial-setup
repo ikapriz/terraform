@@ -1,0 +1,81 @@
+#!/bin/bash
+
+set -eEuo pipefail
+
+project=$1
+
+if [[ -e $project ]]
+then
+  "Error: project ${project} already exists"
+fi
+
+mkdir ${project}
+
+cat << EOF > ${project}/versions.tf
+terraform {
+  required_version = ">= 0.14.5, != 0.15.0"
+
+  required_providers {
+    aws        = ">= 3.26.0"
+    local      = ">= 1.4"
+  }
+}
+EOF
+
+cat << EOF > ${project}/main.tf
+provider "aws" {
+  region  = var.aws_region
+  allowed_account_ids  = [var.aws_account_id]
+}
+EOF
+
+cat << EOF > ${project}/variables.tf
+variable "aws_region" {
+}
+variable "aws_account" {
+}
+variable "environment" {
+}
+variable "project" {
+}
+EOF
+
+for i in dev qa
+do
+  mkdir -p ${project}/environments/${i}
+  cd ${project}/environments/${i}
+  ln -s ../../variables.tf
+  ln -s ../../versions.tf
+  ln -s ../../main.tf
+  cd - > /dev/null
+done
+
+for i in dev qa
+do
+  cat << EOF > ${project}/environments/${i}/backend.tf
+terraform {
+ backend "s3" {
+   key = "${i}/tfstate"
+   region = "us-east-1"
+   bucket = "ngc-${i}-terraform-state"
+   dynamodb_table = "ngc-terraform-${i}"
+   encrypt = true
+ }
+}
+EOF
+
+  if [[ ${i} == 'dev' ]]
+  then
+    account='533689996463'
+  else
+    account='118962990946'
+  fi
+
+  cat << EOF > ${project}/environments/${i}/terraform.tfvars
+aws_region="us-east-1"
+aws_account="${account}"
+environment="${i}"
+project="${project}"
+EOF
+done
+
