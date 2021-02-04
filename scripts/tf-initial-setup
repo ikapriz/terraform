@@ -27,12 +27,19 @@ provider "aws" {
   region  = var.aws_region
   allowed_account_ids  = [var.aws_account_id]
 }
+
+locals {
+  common_tags = {
+    environmnt = var.environment
+    project    = var.project
+  }
+}
 EOF
 
 cat << EOF > ${project}/variables.tf
 variable "aws_region" {
 }
-variable "aws_account" {
+variable "aws_account_id" {
 }
 variable "environment" {
 }
@@ -73,7 +80,7 @@ EOF
 
   cat << EOF > ${project}/environments/${i}/terraform.tfvars
 aws_region="us-east-1"
-aws_account="${account}"
+aws_account_id="${account}"
 environment="${i}"
 project="${project}"
 EOF
